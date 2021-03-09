@@ -1,0 +1,79 @@
+#1. Find the number of restaurants in each borough.
+
+db.restaurants.aggregate([{$group: {_id:"$borough", count:{$sum:1}}}]) 
+
+#2. Find the restaurants in the borough "Queens" and with cuisine "Brazilian", and get the number of restaurants for each zipcode in this borough.
+
+db.restaurants.aggregate([{$match: {borough:"Queens"}}, {$match: {cuisine: "Brazilian"}}, {$group: {_id: "$address.zipcode",count: {$sum:1} } } , {$project: { _id: 0, zipcode: "$_id", count: 1}}])
+
+#3. Obtain the average score for restaurants in each borough ordered by this average descending.
+
+db.restaurants.aggregate(
+[{$addFields: {
+ avgRestaurant: {$avg: "$grades.score"}
+}}, {$group: {
+  _id: "$borough", avgGrade: {$avg: "$avgRestaurant"
+  }}}, {$project: {
+  _id: 0, borough: "$_id", avgGrade: 1
+}}, {$sort: {
+  avgGrade: -1
+}}])
+
+#4. Propose and resolve 5 queries using $unwind, $lookup, $limit, $skip and $count.
+
+#4.1. $unwind: Show the different grades obtained by each restaurant in the borough "Staten Island" with zipcode greater than 10314
+
+db.restaurants.aggregate(
+[{$match: {
+  borough: "Staten Island"
+}}, {$match: {
+  "address.zipcode": {$gt: "10314"}
+}}, {$unwind: {
+  path: "$grades"
+}}])
+
+#4.2. $lookup: Show the opening hours of the restaurant "Kosher Island" and show the restaurant name and the opening hours.
+
+db.OpeningHours.insert({day:"Monday",from:"09.00am",to:"18.00pm", name: "Kosher Island"})
+db.restaurants.aggregate(
+[{$lookup: {
+  from: 'OpeningHours',
+  localField: 'name',
+  foreignField: 'name',
+  as: 'Horario'
+}}, {$match: {
+  name: "Kosher Island"
+}}, {$project: {
+  _id: 0, name: 1, horario:"$Horario"
+}}])
+
+#4.3. $limit: Show the top 5 restaurants in the database ordered by descending average score:
+
+db.restaurants.aggregate(
+[{$addFields: {
+  AvgRestaurant:{$avg:"$grades.score"}
+}}, {$sort: {
+  AvgRestaurant: -1
+}}, {$limit: 5}])
+
+#4.4. $skip: Show the restaurants located more at the west in the borough "Bronx" after skipping the first 10.
+
+db.restaurants.aggregate(
+[{$match: {
+  borough:"Bronx"
+}}, {$sort: {
+  "address.coord.0": 1
+}}, {$skip: 10}])
+
+#4.5. $count: Count the total number of restaurant whose cuisine is not American or Chinese.
+
+db.restaurants.aggregate(
+[{
+    $match: {
+        cuisine: {
+            $nin: ["American", "Chinese"]
+        }
+    }
+}, {
+    $count: 'Resultado'
+}])
